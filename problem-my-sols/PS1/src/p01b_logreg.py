@@ -13,8 +13,12 @@ def main(train_path, eval_path, pred_path):
         pred_path: Path to save predictions.
     """
     x_train, y_train = util.load_dataset(train_path, add_intercept=True)
+    x_eval, y_eval = util.load_dataset(eval_path, add_intercept=True)
 
     # *** START CODE HERE ***
+    clf = LogisticRegression()
+    clf.fit(x_train, y_train)
+    clf.predict(x_eval)
     # *** END CODE HERE ***
 
 
@@ -35,6 +39,19 @@ class LogisticRegression(LinearModel):
             y: Training example labels. Shape (m,).
         """
         # *** START CODE HERE ***
+        m, n = x.shape
+        self.theta = np.zeros(n)
+
+        for _ in range(self.max_iter):
+            pred = 1 / (1 + np.exp(-(x @ self.theta)))
+            gradient_loss = ((y - pred) @ x) / (-m)
+            weights = pred * (1 - pred)
+            hessian_loss = x.T @ (weights[:, None] * x) / m
+            delta = np.linalg.solve(hessian_loss, gradient_loss)
+            self.theta -= delta
+            if np.linalg.norm(delta, ord=1) < self.eps:
+                break
+
         # *** END CODE HERE ***
 
     def predict(self, x):
@@ -47,4 +64,5 @@ class LogisticRegression(LinearModel):
             Outputs of shape (m,).
         """
         # *** START CODE HERE ***
+        return 1 / (1 + np.exp(-(x @ self.theta)))
         # *** END CODE HERE ***
