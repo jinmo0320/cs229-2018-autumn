@@ -14,11 +14,18 @@ def main(train_path, eval_path, pred_path):
     """
     # Load dataset
     x_train, y_train = util.load_dataset(train_path, add_intercept=False)
-    x_eval, y_eval = util.load_dataset(eval_path, add_intercept=True)
+
     # *** START CODE HERE ***
-    clf = GDA()
-    clf.fit(x_train, y_train)
-    clf.predict(x_eval)
+    model = GDA()
+    model.fit(x_train, y_train)
+
+    util.plot(x_train, y_train, model.theta,
+              f'output/p01e_{pred_path[-5]}.png')
+
+    x_eval, y_eval = util.load_dataset(eval_path, add_intercept=True)
+    y_pred = model.predict(x_eval)
+    np.savetxt(pred_path, y_pred > 0.5, fmt='%d')
+
     # *** END CODE HERE ***
 
 
