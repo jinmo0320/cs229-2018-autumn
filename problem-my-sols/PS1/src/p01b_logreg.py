@@ -13,12 +13,18 @@ def main(train_path, eval_path, pred_path):
         pred_path: Path to save predictions.
     """
     x_train, y_train = util.load_dataset(train_path, add_intercept=True)
-    x_eval, y_eval = util.load_dataset(eval_path, add_intercept=True)
 
     # *** START CODE HERE ***
-    clf = LogisticRegression()
-    clf.fit(x_train, y_train)
-    clf.predict(x_eval)
+    model = LogisticRegression()
+    model.fit(x_train, y_train)
+
+    util.plot(x_train, y_train, model.theta,
+              f'output/p01b_{pred_path[-5]}.png')
+
+    x_eval, y_eval = util.load_dataset(eval_path, add_intercept=True)
+    y_pred = model.predict(x_eval)
+    np.savetxt(pred_path, y_pred > 0.5, fmt='%d')
+
     # *** END CODE HERE ***
 
 
