@@ -28,6 +28,16 @@ def main(train_path, valid_path, test_path, pred_path):
     # *** START CODE HERE ***
     # Part (c): Train and test on true labels
     # Make sure to save outputs to pred_path_c
+    x_train, t_train = util.load_dataset(train_path, 't', add_intercept=True)
+    x_test, _ = util.load_dataset(test_path, add_intercept=True)
+    model = LogisticRegression()
+    model.fit(x_train, t_train)
+    util.plot(x_train, t_train, model.theta,
+              f'output/p02c.png')
+
+    t_pred = model.predict(x_test)
+    np.savetxt(pred_path, t_pred > 0.5, fmt='%d')
+
     # Part (d): Train on y-labels and test on true labels
     # Make sure to save outputs to pred_path_d
     # Part (e): Apply correction factor using validation set and test on true labels
