@@ -20,6 +20,7 @@ def add_intercept_fn(x):
 
     return new_x
 
+
 def load_csv(csv_path, label_col='y', add_intercept=False):
     """Load dataset from a CSV file.
 
@@ -51,6 +52,7 @@ def load_csv(csv_path, label_col='y', add_intercept=False):
 
     return inputs, labels
 
+
 def load_spam_dataset(tsv_path):
     """Load the spam dataset from a TSV file
 
@@ -74,6 +76,7 @@ def load_spam_dataset(tsv_path):
 
     return messages, np.array(labels)
 
+
 def plot(x, y, theta, save_path, correction=1.0):
     """Plot dataset and fitted logistic regression parameters.
 
@@ -87,7 +90,7 @@ def plot(x, y, theta, save_path, correction=1.0):
     # Plot dataset
     plt.figure()
     plt.plot(x[y == 1, -2], x[y == 1, -1], 'bx', linewidth=2)
-    plt.plot(x[y == 0, -2], x[y == 0, -1], 'go', linewidth=2)
+    plt.plot(x[y == -1, -2], x[y == -1, -1], 'go', linewidth=2)
 
     # Plot decision boundary (found by solving for theta^T x = 0)
     x1 = np.arange(min(x[:, -2]), max(x[:, -2]), 0.01)
@@ -102,22 +105,26 @@ def plot(x, y, theta, save_path, correction=1.0):
 
 def plot_contour(predict_fn):
     """Plot a contour given the provided prediction function"""
-    x, y = np.meshgrid(np.linspace(-10, 10, num=20), np.linspace(-10, 10, num=20))
+    x, y = np.meshgrid(np.linspace(-10, 10, num=20),
+                       np.linspace(-10, 10, num=20))
     z = np.zeros(x.shape)
 
     for i in range(x.shape[0]):
         for j in range(y.shape[1]):
             z[i, j] = predict_fn([x[i, j], y[i, j]])
 
-    plt.contourf(x, y, z, levels=[-float('inf'), 0, float('inf')], colors=['orange', 'cyan'])
+    plt.contourf(x, y, z, levels=[-float('inf'),
+                 0, float('inf')], colors=['orange', 'cyan'])
+
 
 def plot_points(x, y):
     """Plot some points where x are the coordinates and y is the label"""
     x_one = x[y == 0, :]
     x_two = x[y == 1, :]
-    
-    plt.scatter(x_one[:,0], x_one[:,1], marker='x', color='red')
-    plt.scatter(x_two[:,0], x_two[:,1], marker='o', color='blue')
+
+    plt.scatter(x_one[:, 0], x_one[:, 1], marker='x', color='red')
+    plt.scatter(x_two[:, 0], x_two[:, 1], marker='o', color='blue')
+
 
 def write_json(filename, value):
     """Write the provided value as JSON to the given filename"""
