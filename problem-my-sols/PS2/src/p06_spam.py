@@ -103,21 +103,21 @@ def fit_naive_bayes_model(matrix, labels):
 
     # *** START CODE HERE ***
     phi_spam = np.mean(labels, axis=0)
-    lphi_word_in_spam = np.log((
+    phi_word_in_spam = (
         np.sum(matrix[labels == 1], axis=0) + 1
     ) / (
         np.sum(matrix[labels == 1]) + matrix.shape[1]
-    ))
-    lphi_word_in_ham = np.log((
+    )
+    phi_word_in_ham = (
         np.sum(matrix[labels == 0], axis=0) + 1
     ) / (
         np.sum(matrix[labels == 0]) + matrix.shape[1]
-    ))
+    )
 
     return {
         "phi_spam": phi_spam,
-        "lphi_word_in_spam": lphi_word_in_spam,
-        "lphi_word_in_ham": lphi_word_in_ham
+        "phi_word_in_spam": phi_word_in_spam,
+        "phi_word_in_ham": phi_word_in_ham
     }
     # *** END CODE HERE ***
 
@@ -135,8 +135,10 @@ def predict_from_naive_bayes_model(model, matrix):
     Returns: A numpy array containg the predictions from the model
     """
     # *** START CODE HERE ***
-    spam = matrix @ model["lphi_word_in_spam"] + np.log(model["phi_spam"])
-    ham = matrix @ model["lphi_word_in_ham"] + np.log(1 - model["phi_spam"])
+    spam = matrix @ np.log(model["phi_word_in_spam"]) + \
+        np.log(model["phi_spam"])
+    ham = matrix @ np.log(model["phi_word_in_ham"]) + \
+        np.log(1 - model["phi_spam"])
 
     return spam > ham
     # *** END CODE HERE ***
@@ -155,6 +157,12 @@ def get_top_five_naive_bayes_words(model, dictionary):
     Returns: The top five most indicative words in sorted order with the most indicative first
     """
     # *** START CODE HERE ***
+    top5 = np.argsort(
+        np.log(model["phi_word_in_spam"] / model["phi_word_in_ham"])
+    )[::-1][:5]  # [::-1] is reversing
+    reverse_dict = {v: k for k, v in dictionary.items()}
+
+    return [reverse_dict[v] for v in top5]
     # *** END CODE HERE ***
 
 
