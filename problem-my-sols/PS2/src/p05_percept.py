@@ -16,6 +16,11 @@ def initial_state():
     """
 
     # *** START CODE HERE ***
+    return {
+        'coef': [],
+        'x': [],
+        'iter': 0
+    }
     # *** END CODE HERE ***
 
 
@@ -28,11 +33,16 @@ def predict(state, kernel, x_i):
         kernel: A binary function that takes two vectors as input and returns
             the result of a kernel
         x_i: A vector containing the features for a single instance
-    
+
     Returns:
         Returns the prediction (i.e 0 or 1)
     """
     # *** START CODE HERE ***
+    sum = 0
+    for j in range(state['iter']):
+        sum += state['coef'][j] * kernel(state['x'][j], x_i)
+
+    return sign(sum)
     # *** END CODE HERE ***
 
 
@@ -47,6 +57,10 @@ def update_state(state, kernel, learning_rate, x_i, y_i):
         y_i: A 0 or 1 indicating the label for a single instance
     """
     # *** START CODE HERE ***
+    h = predict(state, kernel, x_i)
+    state['coef'].append(learning_rate*(y_i-h))
+    state['x'].append(x_i)
+    state['iter'] += 1
     # *** END CODE HERE ***
 
 
@@ -108,7 +122,8 @@ def train_perceptron(kernel_name, kernel, learning_rate):
     util.plot_points(test_x, test_y)
     plt.savefig('./output/p05_{}_output.pdf'.format(kernel_name))
 
-    predict_y = [predict(state, kernel, test_x[i, :]) for i in range(test_y.shape[0])]
+    predict_y = [predict(state, kernel, test_x[i, :])
+                 for i in range(test_y.shape[0])]
 
     np.savetxt('./output/p05_{}_predictions'.format(kernel_name), predict_y)
 
