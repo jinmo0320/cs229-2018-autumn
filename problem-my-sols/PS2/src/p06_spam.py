@@ -183,6 +183,17 @@ def compute_best_svm_radius(train_matrix, train_labels, val_matrix, val_labels, 
         The best radius which maximizes SVM accuracy.
     """
     # *** START CODE HERE ***
+    max_accuracy = 0
+    best_radius = 0
+    for r in radius_to_consider:
+        predict = svm.train_and_predict_svm(
+            train_matrix, train_labels, val_matrix, r)
+        accuracy = np.mean(predict == val_labels)
+        if accuracy > max_accuracy:
+            max_accuracy = accuracy
+            best_radius = r
+
+    return best_radius
     # *** END CODE HERE ***
 
 
