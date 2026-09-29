@@ -28,10 +28,20 @@ def main(is_semi_supervised, trial_num):
     # *** START CODE HERE ***
     # (1) Initialize mu and sigma by splitting the m data points uniformly at random
     # into K groups, then calculating the sample mean and covariance for each group
+    x_shuffled = np.random.default_rng().permutation(x, axis=0)
+    groups = np.array_split(x_shuffled, K, axis=0)
+    mu = np.array([g.mean(axis=0) for g in groups])  # (k, 2)
+    sigma = np.array([np.cov(g, rowvar=False) for g in groups])  # (k, 2, 2)
+
     # (2) Initialize phi to place equal probability on each Gaussian
     # phi should be a numpy array of shape (K,)
+    phi = np.full((K, ), 1/K)
+
     # (3) Initialize the w values to place equal probability on each Gaussian
     # w should be a numpy array of shape (m, K)
+    m, _ = x.shape
+    w = np.full((m, K), 1/K)
+
     # *** END CODE HERE ***
 
     if is_semi_supervised:
@@ -74,16 +84,27 @@ def run_em(x, w, phi, mu, sigma):
     it = 0
     ll = prev_ll = None
     while it < max_iter and (prev_ll is None or np.abs(ll - prev_ll) >= eps):
-        pass  # Just a placeholder for the starter code
         # *** START CODE HERE
         # (1) E-step: Update your estimates in w
+        g = np.stack([gaussian(x, u_j, s_j)
+                     for u_j, s_j in zip(mu, sigma)], axis=1)
+        w = (g*phi) / (g*phi).sum(axis=1).reshape(-1, 1)
         # (2) M-step: Update the model parameters phi, mu, and sigma
+        phi = w.mean(axis=0)
+        mu = (w.T @ x) / w.sum(axis=0).reshape(-1, 1)
+        sigma = np.stack([w_j * (x - u_j).T @ (x - u_j)
+                          for u_j, w_j in zip(mu, w.T)], axis=0) / w.sum(axis=0)[:, None, None]
         # (3) Compute the log-likelihood of the data to check for convergence.
         # By log-likelihood, we mean `ll = sum_x[log(sum_z[p(x|z) * p(z)])]`.
         # We define convergence by the first iteration where abs(ll - prev_ll) < eps.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
+        it += 1
+        prev_ll = ll
+        g = np.stack([gaussian(x, u_j, s_j)
+                      for u_j, s_j in zip(mu, sigma)], axis=1)
+        ll = np.sum(np.log((g*phi).sum(axis=1)))
         # *** END CODE HERE ***
-
+    print(f"it: {it}")
     return w
 
 
@@ -115,21 +136,60 @@ def run_semi_supervised_em(x, x_tilde, z, w, phi, mu, sigma):
     # See below for explanation of the convergence criterion
     it = 0
     ll = prev_ll = None
+    labels = z.ravel().astype(int)
+    z_one_hot = np.eye(K, dtype=int)[labels]
+    w_tilde = alpha * z_one_hot
+
     while it < max_iter and (prev_ll is None or np.abs(ll - prev_ll) >= eps):
-        pass  # Just a placeholder for the starter code
         # *** START CODE HERE ***
         # (1) E-step: Update your estimates in w
+        g = np.stack([gaussian(x, u_j, s_j)
+                      for u_j, s_j in zip(mu, sigma)], axis=1)
+        w = (g*phi) / (g*phi).sum(axis=1).reshape(-1, 1)
         # (2) M-step: Update the model parameters phi, mu, and sigma
+        phi = (w.sum(axis=0) + w_tilde.sum(axis=0)) \
+            / (x.shape[0] + alpha * x_tilde.shape[0])
+
+        mu = (w.T @ x + w_tilde.T @ x_tilde) \
+            / (w.sum(axis=0) + w_tilde.sum(axis=0)).reshape(-1, 1)
+
+        sigma = (np.stack([w_j * (x - u_j).T @ (x - u_j) for u_j, w_j in zip(mu, w.T)], axis=0)
+                 + np.stack([w_j * (x_tilde - u_j).T @ (x_tilde - u_j) for u_j, w_j in zip(mu, w_tilde.T)], axis=0)) \
+            / (w.sum(axis=0) + w_tilde.sum(axis=0))[:, None, None]
         # (3) Compute the log-likelihood of the data to check for convergence.
         # Hint: Make sure to include alpha in your calculation of ll.
         # Hint: For debugging, recall part (a). We showed that ll should be monotonically increasing.
-        # *** END CODE HERE ***
+        it += 1
+        prev_ll = ll
+        g = np.stack([
+            gaussian(x, u_j, s_j)
+            for u_j, s_j in zip(mu, sigma)
+        ], axis=1)
 
+        g_tilde = np.stack([
+            gaussian(x_tilde, u_j, s_j)
+            for u_j, s_j in zip(mu, sigma)
+        ], axis=1)
+
+        ll_u = np.log((g * phi).sum(axis=1)).sum()
+        ll_s = np.log(
+            (g_tilde * phi)[np.arange(len(labels)), labels]
+        ).sum()
+
+        ll = ll_u + alpha * ll_s
+        # *** END CODE HERE ***
+    print(f"it: {it}")
     return w
 
 
 # *** START CODE HERE ***
 # Helper functions
+def gaussian(x, mean, cov):
+    _, n = x.shape
+    diff = x - mean  # (m, n)
+    solved = np.linalg.solve(cov, diff.T).T  # (m, n)
+    quadratic = np.sum(diff * solved, axis=1)  # (m,)
+    return np.exp(-0.5 * quadratic) / ((2 * np.pi)**(n/2) * np.linalg.det(cov)**(1/2))
 # *** END CODE HERE ***
 
 
@@ -142,7 +202,8 @@ def plot_gmm_preds(x, z, with_supervision, plot_id):
     NOTE: You do not need to edit this function.
     """
     plt.figure(figsize=(12, 8))
-    plt.title('{} GMM Predictions'.format('Semi-supervised' if with_supervision else 'Unsupervised'))
+    plt.title('{} GMM Predictions'.format(
+        'Semi-supervised' if with_supervision else 'Unsupervised'))
     plt.xlabel('x_1')
     plt.ylabel('x_2')
 
@@ -151,7 +212,8 @@ def plot_gmm_preds(x, z, with_supervision, plot_id):
         alpha = 0.25 if z_ < 0 else 0.75
         plt.scatter(x_1, x_2, marker='.', c=color, alpha=alpha)
 
-    file_name = 'p03_pred{}_{}.pdf'.format('_ss' if with_supervision else '', plot_id)
+    file_name = 'p03_pred{}_{}.pdf'.format(
+        '_ss' if with_supervision else '', plot_id)
     save_path = os.path.join('output', file_name)
     plt.savefig(save_path)
 
@@ -177,8 +239,10 @@ def load_gmm_dataset(csv_path):
     x_cols = [i for i in range(len(headers)) if headers[i].startswith('x')]
     z_cols = [i for i in range(len(headers)) if headers[i] == 'z']
 
-    x = np.loadtxt(csv_path, delimiter=',', skiprows=1, usecols=x_cols, dtype=float)
-    z = np.loadtxt(csv_path, delimiter=',', skiprows=1, usecols=z_cols, dtype=float)
+    x = np.loadtxt(csv_path, delimiter=',', skiprows=1,
+                   usecols=x_cols, dtype=float)
+    z = np.loadtxt(csv_path, delimiter=',', skiprows=1,
+                   usecols=z_cols, dtype=float)
 
     if z.ndim == 1:
         z = np.expand_dims(z, axis=-1)
@@ -192,6 +256,7 @@ if __name__ == '__main__':
     # affect the final predictions with and without supervision
     for t in range(NUM_TRIALS):
         main(is_semi_supervised=False, trial_num=t)
+        main(is_semi_supervised=True, trial_num=t)
 
         # *** START CODE HERE ***
         # Once you've implemented the semi-supervised version,
