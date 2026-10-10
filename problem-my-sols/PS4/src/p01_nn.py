@@ -6,6 +6,7 @@ MAX_POOL_SIZE = 5
 CONVOLUTION_SIZE = 4
 CONVOLUTION_FILTERS = 2
 
+
 def forward_softmax(x):
     """
     Compute softmax function for a single example.
@@ -21,10 +22,11 @@ def forward_softmax(x):
     Returns:
         A 1d numpy float array containing the softmax results of shape  number_of_classes
     """
-    x = x - np.max(x,axis=0)
+    x = x - np.max(x, axis=0)
     exp = np.exp(x)
-    s = exp / np.sum(exp,axis=0)
+    s = exp / np.sum(exp, axis=0)
     return s
+
 
 def backward_softmax(x, grad_outputs):
     """
@@ -39,9 +41,10 @@ def backward_softmax(x, grad_outputs):
     Returns:
         A 1d numpy float array of the same shape as x with the derivative of the loss with respect to x
     """
-    
     # *** START CODE HERE ***
+    return forward_softmax(x) - (grad_outputs != 0).astype(int)
     # *** END CODE HERE ***
+
 
 def forward_relu(x):
     """
@@ -53,9 +56,10 @@ def forward_relu(x):
     Returns:
         A numpy float array containing the relu results
     """
-    x[x<=0] = 0
+    x[x <= 0] = 0
 
     return x
+
 
 def backward_relu(x, grad_outputs):
     """
@@ -71,7 +75,9 @@ def backward_relu(x, grad_outputs):
     """
 
     # *** START CODE HERE ***
+    return grad_outputs * (x > 0)
     # *** END CODE HERE ***
+
 
 def get_initial_params():
     """
@@ -92,8 +98,8 @@ def get_initial_params():
     feed into an output for that layer.
 
     Bias vectors should be initialized with zero.
-    
-    
+
+
     Returns:
         A dict mapping parameter names to numpy arrays
     """
@@ -101,14 +107,16 @@ def get_initial_params():
     size_after_convolution = 28 - CONVOLUTION_SIZE + 1
     size_after_max_pooling = size_after_convolution // MAX_POOL_SIZE
 
-    num_hidden = size_after_max_pooling * size_after_max_pooling * CONVOLUTION_FILTERS
+    num_hidden = size_after_max_pooling * \
+        size_after_max_pooling * CONVOLUTION_FILTERS
 
     return {
-        'W1': np.random.normal(size = (CONVOLUTION_FILTERS, 1, CONVOLUTION_SIZE, CONVOLUTION_SIZE), scale=1/ math.sqrt(CONVOLUTION_SIZE * CONVOLUTION_SIZE)),
+        'W1': np.random.normal(size=(CONVOLUTION_FILTERS, 1, CONVOLUTION_SIZE, CONVOLUTION_SIZE), scale=1 / math.sqrt(CONVOLUTION_SIZE * CONVOLUTION_SIZE)),
         'b1': np.zeros(CONVOLUTION_FILTERS),
-        'W2': np.random.normal(size = (num_hidden, 10), scale = 1/ math.sqrt(num_hidden)),
+        'W2': np.random.normal(size=(num_hidden, 10), scale=1 / math.sqrt(num_hidden)),
         'b2': np.zeros(10)
     }
+
 
 def forward_convolution(conv_W, conv_b, data):
     """
@@ -130,7 +138,8 @@ def forward_convolution(conv_W, conv_b, data):
 
     input_channels, input_width, input_height = data.shape
 
-    output = np.zeros((conv_channels, input_width - conv_width + 1, input_height - conv_height + 1))
+    output = np.zeros((conv_channels, input_width -
+                      conv_width + 1, input_height - conv_height + 1))
 
     for x in range(input_width - conv_width + 1):
         for y in range(input_height - conv_height + 1):
@@ -139,6 +148,7 @@ def forward_convolution(conv_W, conv_b, data):
                     np.multiply(data[:, x:(x + conv_width), y:(y + conv_height)], conv_W[output_channel, :, :, :])) + conv_b[output_channel]
 
     return output
+
 
 def backward_convolution(conv_W, conv_b, data, output_grad):
     """
@@ -155,7 +165,31 @@ def backward_convolution(conv_W, conv_b, data, output_grad):
     """
 
     # *** START CODE HERE ***
+    num_filters, _, filter_width, filter_height = conv_W.shape
+    _, output_width, output_height = output_grad.shape
+
+    grad_weight = np.zeros_like(conv_W, dtype=float)
+    grad_bias = output_grad.sum(axis=(1, 2))
+    grad_data = np.zeros_like(data, dtype=float)
+
+    for k in range(num_filters):
+        for x in range(output_width):
+            for y in range(output_height):
+                region = (
+                    slice(None),  # 모든 입력 채널 [:]
+                    slice(x, x + filter_width),  # [x : x + filter_width]
+                    slice(y, y + filter_height),  # [y : y + filter_height]
+                )
+
+                patch = data[region]
+                g = output_grad[k, x, y]
+
+                grad_weight[k] += g * patch
+                grad_data[region] += g * conv_W[k]
+
+    return grad_weight, grad_bias, grad_data
     # *** END CODE HERE ***
+
 
 def forward_max_pool(data, pool_width, pool_height):
     """
@@ -172,15 +206,18 @@ def forward_max_pool(data, pool_width, pool_height):
         The result of the max pooling layer
     """
     input_channels, input_width, input_height = data.shape
-    
-    output = np.zeros((input_channels, input_width // pool_width, input_height // pool_height))
+
+    output = np.zeros((input_channels, input_width //
+                      pool_width, input_height // pool_height))
 
     for x in range(0, input_width, pool_width):
         for y in range(0, input_height, pool_height):
 
-            output[:, x // pool_width, y // pool_height] = np.amax(data[:, x:(x + pool_width), y:(y + pool_height)], axis=(1, 2))
+            output[:, x // pool_width, y // pool_height] = np.amax(
+                data[:, x:(x + pool_width), y:(y + pool_height)], axis=(1, 2))
 
     return output
+
 
 def backward_max_pool(data, pool_width, pool_height, output_grad):
     """
@@ -195,9 +232,27 @@ def backward_max_pool(data, pool_width, pool_height, output_grad):
     Returns:
         The gradient of the loss with respect to the data (of same shape as data)
     """
-    
+
     # *** START CODE HERE ***
+    input_channels, input_width, input_height = data.shape
+    grads = np.zeros(data.shape)
+
+    for i in range(input_channels):
+        for x in range(0, input_width, pool_width):
+            for y in range(0, input_height, pool_height):
+                t = data[i, x:(x + pool_width), y:(y + pool_height)]
+
+                # 현재 영역 안에서 최댓값의 좌표
+                dx, dy = np.unravel_index(t.argmax(), t.shape)
+
+                # 원본 입력의 좌표로 변환하여 기울기를 전달
+                grads[i, x + dx, y + dy] = output_grad[
+                    i, x // pool_width, y // pool_height
+                ]
+
+    return grads
     # *** END CODE HERE ***
+
 
 def forward_cross_entropy_loss(probabilities, labels):
     """
@@ -220,6 +275,7 @@ def forward_cross_entropy_loss(probabilities, labels):
 
     return result
 
+
 def backward_cross_entropy_loss(probabilities, labels):
     """
     Compute the gradient of the cross entropy loss with respect to the probabilities.
@@ -234,7 +290,9 @@ def backward_cross_entropy_loss(probabilities, labels):
     """
 
     # *** START CODE HERE ***
+    return - labels / probabilities
     # *** END CODE HERE ***
+
 
 def forward_linear(weights, bias, data):
     """
@@ -249,6 +307,7 @@ def forward_linear(weights, bias, data):
         The result of the linear layer
     """
     return data.dot(weights) + bias
+
 
 def backward_linear(weights, bias, data, output_grad):
     """
@@ -265,12 +324,17 @@ def backward_linear(weights, bias, data, output_grad):
     """
 
     # *** START CODE HERE ***
+    grad_weights = np.outer(data, output_grad)
+    grad_bias = output_grad
+    grad_data = weights @ output_grad
+    return (grad_weights, grad_bias, grad_data)
     # *** END CODE HERE ***
+
 
 def forward_prop(data, labels, params):
     """
     Implement the forward layer given the data, labels, and params.
-    
+
     Args:
         data: A numpy array containing the input (shape is 1 by 28 by 28)
         labels: A 1d numpy array containing the labels (shape is 10)
@@ -289,13 +353,13 @@ def forward_prop(data, labels, params):
     b1 = params['b1']
     W2 = params['W2']
     b2 = params['b2']
-
     first_convolution = forward_convolution(W1, b1, data)
-    first_max_pool = forward_max_pool(first_convolution, MAX_POOL_SIZE, MAX_POOL_SIZE)
+    first_max_pool = forward_max_pool(
+        first_convolution, MAX_POOL_SIZE, MAX_POOL_SIZE)
     first_after_relu = forward_relu(first_max_pool)
 
     flattened = np.reshape(first_after_relu, (-1))
-    
+
     logits = forward_linear(W2, b2, flattened)
 
     y = forward_softmax(logits)
@@ -303,10 +367,11 @@ def forward_prop(data, labels, params):
 
     return y, cost
 
+
 def backward_prop(data, labels, params):
     """
     Implement the backward propagation gradient computation step for a neural network
-    
+
     Args:
         data: A numpy array containing the input for a single example
         labels: A 1d numpy array containing the labels for a single example
@@ -318,13 +383,44 @@ def backward_prop(data, labels, params):
     Returns:
         A dictionary of strings to numpy arrays where each key represents the name of a weight
         and the values represent the gradient of the loss with respect to that weight.
-        
+
         In particular, it should have 4 elements:
             W1, W2, b1, and b2
     """
 
     # *** START CODE HERE ***
+    W1 = params['W1']
+    b1 = params['b1']
+    W2 = params['W2']
+    b2 = params['b2']
+
+    first_convolution = forward_convolution(W1, b1, data)
+    first_max_pool = forward_max_pool(
+        first_convolution, MAX_POOL_SIZE, MAX_POOL_SIZE)
+    first_after_relu = forward_relu(first_max_pool)
+    flattened = np.reshape(first_after_relu, (-1))
+    logits = forward_linear(W2, b2, flattened)
+    y = forward_softmax(logits)
+
+    grad_CE_loss = backward_cross_entropy_loss(y, labels)
+    grad_softmax = backward_softmax(logits, grad_CE_loss)
+    grad_W2, grad_b2, grad_linear = backward_linear(
+        W2, b2, flattened, grad_softmax)
+    grad_relu = backward_relu(
+        first_max_pool, grad_linear.reshape(first_max_pool.shape))
+    grad_max_pool = backward_max_pool(
+        first_convolution, MAX_POOL_SIZE, MAX_POOL_SIZE, grad_relu)
+    grad_W1, grad_b1, grad_convolution = backward_convolution(
+        W1, b1, data, grad_max_pool)
+
+    return {
+        'W1': grad_W1,
+        'b1': grad_b1,
+        'W2': grad_W2,
+        'b2': grad_b2
+    }
     # *** END CODE HERE ***
+
 
 def forward_prop_batch(batch_data, batch_labels, params, forward_prop_func):
     """Apply the forward prop func to every image in a batch"""
@@ -338,6 +434,7 @@ def forward_prop_batch(batch_data, batch_labels, params, forward_prop_func):
         cost_array.append(cost)
 
     return np.array(y_array), np.array(cost_array)
+
 
 def gradient_descent_batch(batch_data, batch_labels, learning_rate, params, backward_prop_func):
     """
@@ -377,10 +474,11 @@ def gradient_descent_batch(batch_data, batch_labels, learning_rate, params, back
     # This function does not return anything
     return
 
+
 def nn_train(
-    train_data, train_labels, dev_data, dev_labels,
-    get_initial_params_func, forward_prop_func, backward_prop_func,
-    learning_rate=5.0, batch_size=16, num_batches=400):
+        train_data, train_labels, dev_data, dev_labels,
+        get_initial_params_func, forward_prop_func, backward_prop_func,
+        learning_rate=5.0, batch_size=16, num_batches=400):
 
     m = train_data.shape[0]
 
@@ -391,39 +489,46 @@ def nn_train(
     for batch in range(num_batches):
         print('Currently processing {} / {}'.format(batch, num_batches))
 
-        batch_data = train_data[batch * batch_size:(batch + 1) * batch_size, :, :, :]
-        batch_labels = train_labels[batch * batch_size: (batch + 1) * batch_size, :]
+        batch_data = train_data[batch *
+                                batch_size:(batch + 1) * batch_size, :, :, :]
+        batch_labels = train_labels[batch *
+                                    batch_size: (batch + 1) * batch_size, :]
 
         if batch % 100 == 0:
-            output, cost = forward_prop_batch(dev_data, dev_labels, params, forward_prop_func)
+            output, cost = forward_prop_batch(
+                dev_data, dev_labels, params, forward_prop_func)
             cost_dev.append(sum(cost) / len(cost))
             accuracy_dev.append(compute_accuracy(output, dev_labels))
 
             print('Cost and accuracy', cost_dev[-1], accuracy_dev[-1])
 
         gradient_descent_batch(batch_data, batch_labels,
-            learning_rate, params, backward_prop_func)
+                               learning_rate, params, backward_prop_func)
 
     return params, cost_dev, accuracy_dev
 
+
 def nn_test(data, labels, params):
-    output, cost = forward_pr(data, labels, params)
+    output, cost = forward_prop(data, labels, params)
     accuracy = compute_accuracy(output, labels)
     return accuracy
 
-def compute_accuracy(output, labels):
-    correct_output = np.argmax(output,axis=1)
-    correct_labels = np.argmax(labels,axis=1)
 
-    is_correct = [a == b for a,b in zip(correct_output, correct_labels)]
+def compute_accuracy(output, labels):
+    correct_output = np.argmax(output, axis=1)
+    correct_labels = np.argmax(labels, axis=1)
+
+    is_correct = [a == b for a, b in zip(correct_output, correct_labels)]
 
     accuracy = sum(is_correct) * 1. / labels.shape[0]
     return accuracy
 
+
 def one_hot_labels(labels):
     one_hot_labels = np.zeros((labels.size, 10))
-    one_hot_labels[np.arange(labels.size),labels.astype(int)] = 1
+    one_hot_labels[np.arange(labels.size), labels.astype(int)] = 1
     return one_hot_labels
+
 
 def read_data(images_file, labels_file):
     x = np.loadtxt(images_file, delimiter=',')
@@ -432,6 +537,7 @@ def read_data(images_file, labels_file):
     x = np.reshape(x, (x.shape[0], 1, 28, 28))
 
     return x, y
+
 
 def run_train(all_data, all_labels, backward_prop_func):
     params, cost_dev, accuracy_dev = nn_train(
@@ -456,18 +562,20 @@ def run_train(all_data, all_labels, backward_prop_func):
 
     fig.savefig('output/train.png')
 
+
 def main():
     np.random.seed(100)
-    train_data, train_labels = read_data('../data/images_train.csv', '../data/labels_train.csv')
+    train_data, train_labels = read_data(
+        '../data/images_train.csv', '../data/labels_train.csv')
     train_labels = one_hot_labels(train_labels)
     p = np.random.permutation(60000)
-    train_data = train_data[p,:]
-    train_labels = train_labels[p,:]
+    train_data = train_data[p, :]
+    train_labels = train_labels[p, :]
 
-    dev_data = train_data[0:400,:]
-    dev_labels = train_labels[0:400,:]
-    train_data = train_data[400:,:]
-    train_labels = train_labels[400:,:]
+    dev_data = train_data[0:400, :]
+    dev_labels = train_labels[0:400, :]
+    train_data = train_data[400:, :]
+    train_labels = train_labels[400:, :]
 
     mean = np.mean(train_data)
     std = np.std(train_data)
@@ -483,8 +591,9 @@ def main():
         'train': train_labels,
         'dev': dev_labels,
     }
-    
+
     run_train(all_data, all_labels, backward_prop)
+
 
 if __name__ == '__main__':
     main()
