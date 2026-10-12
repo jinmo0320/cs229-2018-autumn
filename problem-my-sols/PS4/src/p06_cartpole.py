@@ -78,6 +78,7 @@ initial learning quickly, and start the display only after the
 performance is reasonable.
 """
 
+
 def initialize_mdp_data(num_states):
     """
     Return a variable that contains all the parameters/state you need for your MDP.
@@ -111,6 +112,7 @@ def initialize_mdp_data(num_states):
         'num_states': num_states,
     }
 
+
 def choose_action(state, mdp_data):
     """
     Choose the next action (0 or 1) that is optimal according to your current
@@ -125,7 +127,16 @@ def choose_action(state, mdp_data):
     """
 
     # *** START CODE HERE ***
+    transition_probs = mdp_data['transition_probs']
+    value = mdp_data['value']
+    action_values = value @ transition_probs[state, :, :]
+
+    if action_values[0] == action_values[1]:
+        return np.random.randint(2)
+
+    return np.argmax(action_values)
     # *** END CODE HERE ***
+
 
 def update_mdp_transition_counts_reward_counts(mdp_data, state, action, new_state, reward):
     """
@@ -138,7 +149,7 @@ def update_mdp_transition_counts_reward_counts(mdp_data, state, action, new_stat
     Record the number of time `new_state` was reached (in 'reward_counts' index new_state,1)
 
     Args:
-        mdp_data: The parameters of your MDP. See initialize_mdp_data.
+        mdp_data: The parameters of your MDP. See initialize_mdp_datas.
         state: The state that was observed at the start.
         action: The action you performed.
         new_state: The state after your action.
@@ -149,10 +160,17 @@ def update_mdp_transition_counts_reward_counts(mdp_data, state, action, new_stat
     """
 
     # *** START CODE HERE ***
+    mdp_data['transition_counts'][state, new_state, action] += 1
+
+    if reward == -1:
+        mdp_data['reward_counts'][new_state, 0] += 1
+
+    mdp_data['reward_counts'][new_state, 1] += 1
     # *** END CODE HERE ***
 
     # This function does not return anything
     return
+
 
 def update_mdp_transition_probs_reward(mdp_data):
     """
@@ -162,7 +180,7 @@ def update_mdp_transition_probs_reward(mdp_data):
     been tried before, or the state has never been visited before. In that
     case, you must not change that component (and thus keep it at the
     initialized uniform distribution).
-    
+
     Args:
         mdp_data: The data for your MDP. See initialize_mdp_data.
 
@@ -172,10 +190,26 @@ def update_mdp_transition_probs_reward(mdp_data):
     """
 
     # *** START CODE HERE ***
+    transition_counts = mdp_data['transition_counts']
+    totals = transition_counts.sum(axis=1, keepdims=True)
+    np.divide(
+        transition_counts,
+        totals,
+        out=mdp_data['transition_probs'],
+        where=totals > 0,
+    )
+
+    reward_counts = mdp_data['reward_counts']
+    visits = reward_counts[:, 1]
+    visited = visits > 0
+    mdp_data['reward'][visited] = (
+        -reward_counts[visited, 0] / visits[visited]
+    )
     # *** END CODE HERE ***
 
     # This function does not return anything
     return
+
 
 def update_mdp_value(mdp_data, tolerance, gamma):
     """
@@ -186,7 +220,7 @@ def update_mdp_value(mdp_data, tolerance, gamma):
     at the top of the file.
 
     Return true if it converges within one iteration.
-    
+
     Args:
         mdp_data: The data for your MDP. See initialize_mdp_data.
         tolerance: The tolerance to use for the convergence criterion.
@@ -198,11 +232,27 @@ def update_mdp_value(mdp_data, tolerance, gamma):
     """
 
     # *** START CODE HERE ***
+    iters = 0
+    transition_probs = mdp_data['transition_probs']
+
+    while True:
+        iters += 1
+
+        value = mdp_data['value']
+        new_value = mdp_data['reward'] + gamma * \
+            (value @ transition_probs).max(axis=1)
+        mdp_data['value'] = new_value
+
+        if np.max(np.abs(value - new_value)) < tolerance:
+            break
+
+    return iters == 1
     # *** END CODE HERE ***
+
 
 def main(plot=True):
     # Seed the randomness of the simulation so this outputs the same thing each time
-    seed = 0
+    seed = 3
     np.random.seed(seed)
 
     # Simulation parameters
@@ -273,7 +323,8 @@ def main(plot=True):
         else:
             R = 0
 
-        update_mdp_transition_counts_reward_counts(mdp_data, state, action, new_state, R)
+        update_mdp_transition_counts_reward_counts(
+            mdp_data, state, action, new_state, R)
 
         # Recompute MDP model whenever pole falls
         # Compute the value function V for the new model
@@ -281,7 +332,8 @@ def main(plot=True):
 
             update_mdp_transition_probs_reward(mdp_data)
 
-            converged_in_one_iteration = update_mdp_value(mdp_data, TOLERANCE, GAMMA)
+            converged_in_one_iteration = update_mdp_value(
+                mdp_data, TOLERANCE, GAMMA)
 
             if converged_in_one_iteration:
                 consecutive_no_learning_trials = consecutive_no_learning_trials + 1
@@ -326,6 +378,7 @@ def main(plot=True):
         plt.savefig('output/control_{}.png'.format(seed))
 
     return np.array(time_steps_to_failure)
-    
+
+
 if __name__ == '__main__':
     main()
